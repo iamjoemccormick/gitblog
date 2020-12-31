@@ -11,15 +11,24 @@ import (
 	"github.com/gomarkdown/markdown"
 )
 
+type template struct {
+	path     string
+	template []byte
+}
+
 var (
 	staticBase            string = "static/"
-	supportedFileTypes           = [3]string{".md", ".html", ".htm"} // In order of greatest to least priority in case of duplicates.
-	supportedDefaultFiles        = [2]string{"index", "home"}        // In order of greatest to least priority in case of duplicates.
+	supportedFileTypes           = [3]string{".md", ".html", ".htm"}                                   // In order of greatest to least priority in case of duplicates.
+	supportedDefaultFiles        = [2]string{"index", "home"}                                          // In order of greatest to least priority in case of duplicates.
+	baseTemplatePath      string = "base.html"                                                         // If a path is omitted the base template will be "{{ content }}".
+	baseTemplate                 = template{path: baseTemplatePath, template: []byte("{{ content }}")} // Global variable used to store the contents of a base template.
 )
 
 func main() {
 	log.SetOutput(os.Stdout)
+	baseTemplate.loadTemplate()
 	http.HandleFunc("/", handleURL)
+	http.HandleFunc("/gitposthook", gitPostHook)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -47,15 +56,12 @@ func handleURL(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "500: Internal server error attempting to access '%s'.", path)
 		}
 	} else {
-
-		fmt.Fprintf(w, "<head></head>")
 		if ft == ".md" {
-			content = markdown.ToHTML(content, nil, nil)
+			//TODO: Sanitize untrusted content: https://github.com/gomarkdown/markdown#sanitize-untrusted-content
+			content = (markdown.ToHTML(content, nil, nil))
 		}
-		w.Write(content)
-		//TODO: Sanitize untrusted content: https://github.com/gomarkdown/markdown#sanitize-untrusted-content
+		w.Write([]byte(strings.Replace(string(baseTemplate.template), "{{ content }}", string(content), 1)))
 	}
-
 }
 
 // handleDirectory checks if there is a supportedDefaultFile in a given directory path and returns the result of readFile if it exists, or an error.
@@ -103,4 +109,32 @@ func readFile(path string) (fileType string, content []byte, err error) {
 
 	log.Printf("No file found at '%s' with the following file types %s", path, supportedFileTypes)
 	return "", nil, err
+}
+
+// WIP: gitPostHook will be used to pull down changes when an HTTP POST is received from the configured repository.
+// For now we just ensure the base template is reloaded.
+func gitPostHook(w http.ResponseWriter, r *http.Request) {
+
+	baseTemplate.loadTemplate()
+	fmt.Fprintf(w, "Successfully reloaded base template.")
+}
+
+// loadTemplate takes a template and if a path is provided the contents are loaded from disk.
+// If the path is empty then contents are set to "".
+// Returns a fatal error if a path was provided but an error occured reading the file.
+func (t *template) loadTemplate() (err error) {
+
+	if t.path != "" {
+		_, t.template, err = readFile(t.path)
+
+		if err != nil {
+			log.Fatalf("FATAL: A path to a base template was provided, but the following error occured trying to read the file: %s", err)
+			return err
+		}
+		log.Printf("Successfully loaded base template from path '%s'", t.path)
+		return err
+	}
+	t.template = []byte("")
+	log.Printf("No path to a base template was provided, defaulting to '%s'", t.template)
+	return err
 }

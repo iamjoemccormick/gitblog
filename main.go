@@ -21,6 +21,7 @@ var (
 
 func main() {
 	log.SetOutput(os.Stdout)
+	buildNav()
 	baseTemplate.loadTemplate()
 	http.HandleFunc("/", handleURL)
 	http.HandleFunc("/gitposthook", handleGitPostHook)
@@ -31,6 +32,7 @@ func main() {
 // For now we just ensure the base template is reloaded.
 func handleGitPostHook(w http.ResponseWriter, r *http.Request) {
 
+	buildNav()
 	baseTemplate.loadTemplate()
 	fmt.Fprintf(w, "Successfully reloaded base template.")
 }

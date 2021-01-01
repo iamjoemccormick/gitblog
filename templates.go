@@ -2,12 +2,20 @@ package main
 
 import (
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
 type template struct {
 	path     string
 	template []byte
+}
+
+type navItem struct {
+	text     string
+	path     string
+	children []navItem
 }
 
 // loadTemplate takes a template and if a path is provided the contents are loaded from disk.
@@ -30,9 +38,27 @@ func (t *template) loadTemplate() (err error) {
 	return err
 }
 
+func buildNav() (nav string) {
+
+	var directories []string
+
+	filepath.Walk(staticBase, func(path string, info os.FileInfo, err error) error {
+		if strings.HasPrefix(info.Name(), ".") {
+			return filepath.SkipDir
+		}
+
+		if info.IsDir() {
+			directories = append(directories, path)
+		}
+		return nil
+	})
+
+	// TODO: Parse directories into a nav structure.
+	return nav
+}
+
 func (t *template) parseTemplate(content []byte) (parsedTemplate []byte) {
 
-	//w.Write([]byte(strings.Replace(string(baseTemplate.template), "{{ content }}", string(content), 1)))
-
+	// TODO: Is there a more efficient way to do this?
 	return []byte(strings.Replace(string(baseTemplate.template), "{{ content }}", string(content), 1))
 }

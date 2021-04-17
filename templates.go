@@ -14,8 +14,8 @@ type template struct {
 
 type navItem struct {
 	text     string
-	path     string
-	children []navItem
+	url      string
+	children []*navItem
 }
 
 // loadTemplate takes a template and if a path is provided the contents are loaded from disk.
@@ -38,6 +38,7 @@ func (t *template) loadTemplate() (err error) {
 	return err
 }
 
+// buildNav() dynamically generates the site navigation based on the directory structure under staticBase.
 func buildNav() (nav string) {
 
 	var directories []string
@@ -48,12 +49,43 @@ func buildNav() (nav string) {
 		}
 
 		if info.IsDir() {
-			directories = append(directories, path)
+			directories = append(directories, strings.Join(strings.Split(path, staticBase)[1:], ""))
 		}
 		return nil
 	})
 
-	// TODO: Parse directories into a nav structure.
+	baseNav := []*navItem{}
+
+	for _, dir := range directories {
+		currentNav := &baseNav
+
+		for _, section := range strings.Split(dir, "/") {
+			appendSection := true
+
+			for _, c := range *currentNav {
+				if c.text == section {
+					appendSection = false
+					currentNav = &c.children
+				}
+			}
+
+			if appendSection == true {
+				newNav := &navItem{text: section, url: dir}
+				*currentNav = append(*currentNav, newNav)
+
+				// Note this is technically unnecessary since filepath.Walk will return in lexical order, in other words we'll always get tech/ before tech/golang.
+				// However this ensures this function still works even if we get a child directory before we have an entry for it's parent in currentNav.
+				currentNav = &newNav.children
+			}
+		}
+	}
+
+	//TODO: Figure out what we want to return from this function.
+	// OPTION 1: Parse out nav structure (regardless of depth) into HTML, probably has an unordered list that can just be inserted into a template.
+	// OPTION 2: Return a structure that can be iterated over from a template allowing highly customizable navigation.
+	// This would require implementing templating support for for loops then puts the burden on the user to worry about how deep the navigation goes
+	// (or how deep a navigation bar they want to display).
+
 	return nav
 }
 
